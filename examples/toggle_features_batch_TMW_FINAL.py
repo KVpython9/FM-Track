@@ -45,16 +45,6 @@ dims = np.array([441.856, 441.856, 119.23])
 
 for j in range(len(path)):
     try:
-        # (1) compute cellular boundary from images
-        #print('Importing cell data for j{} at {}' .format(j, datetime.datetime.now().strftime("%H:%M")))
-        cell_channel = 0
-        cell_threshold = 10
-        cell_init = fmtrack.FMMesh()
-        cell_init.get_cell_surface(path[j] + "Drug/Cells/Drug.nd2 - Drug%s.tif", dims, cell_channel=cell_channel, cell_threshold=cell_threshold)
-        cell_final = fmtrack.FMMesh()
-        cell_final.get_cell_surface(path[j] + "Basal/Cells/Basal.nd2 - Basal%s.tif", dims, cell_channel=cell_channel, cell_threshold=cell_threshold)
-
-        
         # (2) find bead positions from images
         print('Importing bead data for j{} at {}.' .format(j, datetime.datetime.now().strftime("%H:%M")))
         bead_channel = 1
@@ -72,21 +62,15 @@ for j in range(len(path)):
 
 
         # (4) run tracking algorithm
-        tracker = fmtrack.FMTracker(cell_init=cell_init, cell_final=cell_final, beads_init=beads_init, beads_final=beads_final)
+        tracker = fmtrack.FMTracker(beads_init=beads_init, beads_final=beads_final)
         tracker.print_progress = True   # toggles on and off printing status bars
-        tracker.track_type = 2   # 1 = no tracking correction, 2 = tracking correctiion for microscope drift
+        tracker.track_type = 1   # 1 = no tracking correction, 2 = tracking correctiion for microscope drift
         tracker.num_feat = 5   # number of feature vectors
         tracker.num_nearest = 5   # number of beads in final state to compare to a particular bead in the initial state 
-        tracker.buffer_cell = 60   #60  buffer around cell beyond which beads are considered "far field" in microns. If there's a high displacement of beads beyond 60 um from boundary of cell. e.g. More than 60 um is far field.
         tracker.use_box = False   # True = far field boundary is rectangular prism, False = far field boundary is determined by dist. to cell surface
-        tracker.should_remove_spurious = True   # if true, removes spurious far-field beads after tracking. Only use if track_type=2
-        tracker.spurious_mag = 1   # magnitude of displacement above which a far-field bead is deemed "spurious" and removed from matches
-        tracker.run_gp = False   # if true, makes and plots a gp model 
         tracker.run_tracking()
         
         # (5) save all of the output data
-        tracker.gp_corrected_cell = False   # if true, plots the cell with translation correction in gpr plots
-        tracker.save_native_mesh = True   # true = saves cell boundaries as text files, false = saves gmsh files
         track_folder = path[j] + "Drug/Cells/Smoothed_SA_Corrected/Track"
         tracker.save_all(track_folder, dims=dims)
         

@@ -52,9 +52,9 @@ class FMTracker:
 		self.beads_init_spurious = None
 		self.beads_final_spurious = None
 
-		self.save_native_mesh = False
+		self.save_native_mesh = True
 		self.run_gp = False
-		self.gp_corrected_cell = True
+		self.gp_corrected_cell = False
 
 	def save(self,filename):
 		# saves entire FMTracker object by pickling it
