@@ -2,11 +2,9 @@ import glob
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
-from skimage.filters import threshold_otsu
-from skimage.measure import label, regionprops, marching_cubes   
+from skimage.filters import threshold_otsu 
 import pyvista
-from . import fmmesh
-from . import fmbeads
+from fmtrack import *
 import pathlib
 
 def tif_reader(input_file,color_idx):
@@ -116,8 +114,8 @@ def get_cell_surface(input_file, dims, color_idx=0, cell_threshold=1.0):
 	bw_cell = np.swapaxes(bw_cell,0,1)
 	
 	# get the cell surface mesh from the marching cubes algorithm and the isolated cell image
-	# https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.marching_cubes
-	verts,faces, normals,_ = marching_cubes(bw_cell,spacing=(X_DIM/bw_cell.shape[0], Y_DIM/bw_cell.shape[1], Z_DIM/bw_cell.shape[2]))
+	# https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.marching_cubes_lewiner
+	verts,faces, normals,_ = marching_cubes_lewiner(bw_cell,spacing=(X_DIM/bw_cell.shape[0], Y_DIM/bw_cell.shape[1], Z_DIM/bw_cell.shape[2]))
 	
 	# save surface mesh info
 	mesh.points = verts
@@ -127,60 +125,73 @@ def get_cell_surface(input_file, dims, color_idx=0, cell_threshold=1.0):
 	return mesh
 
 
+import vtk
+import numpy as np
+from vtk.util.numpy_support import numpy_to_vtk
+
+def save_vti(filename, arr, dataTag="scalar", spacing=(0.863, 0.863, 0.863)):
+    nx, ny, nz = arr.shape
+    image = vtk.vtkImageData()
+    image.SetSpacing(*spacing)
+    image.SetExtent(0, nx, 0, ny, 0, nz)
+
+    arr2 = np.swapaxes(arr, 0, 2)
+    flat = np.ascontiguousarray(arr2).ravel(order="C")
+    vtk_arr = numpy_to_vtk(num_array=flat, deep=True)
+    vtk_arr.SetName(dataTag)
+
+    image.GetCellData().SetScalars(vtk_arr)
+
+    writer = vtk.vtkXMLImageDataWriter()
+    writer.SetFileName(filename)
+    writer.SetInputData(image)
+    writer.SetDataModeToBinary()
+    writer.Write()
+
+
 ##########################################################################################
 # functions to pre-process bead images
 #	OUTPUTS:
 #		- x, y, z position of each bead based on the input images 
 ##########################################################################################
-def get_bead_centers(input_file, dims, color_idx=1):
-	"""Creates a FMBeads object from image data
+input_file = "/Volumes/SG - 500G/mMVICS CytoD/20260209n1 mMVICS WT P5 CytoD 1PT03_BS-PT863_VS_Bconc_0PT1/Cell 1/Drug/Beads/Drug.nd2 - Drug%s.tif"
+dims = np.array([441.856, 441.856, 119.23])
+color_idx=1
 
-	Parameters
-	----------
-	input_file : str
-		String containing the filename format
-		Example : input_file='./CytoD/Beads/Gel 2 CytoD%s.tif'
-	dims : np.array
-		Total length of microscope imagery along the x, y, and z dimensions
-	color_idx : 
-		The color to examine (0=red, 1=green, 2=blue)
+X_DIM = dims[0]; Y_DIM = dims[1]; Z_DIM = dims[2]
 
-	Returns 
-	----------
-	beads : FMBeads
-		An FMBeads object with bead positions corresponding to those calculated from imagery data
+# import the image file and apply a gaussian filter 
+all_array = tif_reader(input_file,color_idx)
+all_array = ndimage.gaussian_filter(all_array,1)
 
-    """
+print("Saving .vti version of blurred...")
+save_vti(os.path.join(os.path.dirname(input_file), "blurred_beads.vti"), all_array)
 
-	X_DIM = dims[0]; Y_DIM = dims[1]; Z_DIM = dims[2]
+# apply an otsu filter, specify the filter at each z slice 
+# otsu filter https://en.wikipedia.org/wiki/Otsu%27s_method 
+num_slice = all_array.shape[2]
+bw = np.zeros((all_array.shape))
+for kk in range(0,num_slice):
+    thresh = threshold_otsu(all_array[:,:,kk])
+    bw[:,:,kk] = all_array[:,:,kk] > thresh
 
-	# import the image file and apply a gaussian filter 
-	all_array = tif_reader(input_file,color_idx)
-	all_array = ndimage.gaussian_filter(all_array,1)
-	
-	# apply an otsu filter, specify the filter at each z slice 
-	# otsu filter https://en.wikipedia.org/wiki/Otsu%27s_method 
-	num_slice = all_array.shape[2]
-	bw = np.zeros((all_array.shape))
-	for kk in range(0,num_slice):
-		thresh = threshold_otsu(all_array[:,:,kk])
-		bw[:,:,kk] = all_array[:,:,kk] > thresh
-	
-	# find connected volumes within the image, assume each connected volume is a bead 
-	# record the centroid of each connected volume as the location of the beads
-	# relies on https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.regionprops
-	label_img = label(bw, connectivity=bw.ndim)
-	props = regionprops(label_img)
-	centroids = np.zeros((len(props),3))
-	for kk in range(len(props)):
-		centroids[kk]=props[kk].centroid
-	
-	centroids_order = np.zeros(centroids.shape)
-	centroids_order[:,0] = centroids[:,1] * X_DIM / bw.shape[1] 
-	centroids_order[:,1] = centroids[:,0] * Y_DIM / bw.shape[0]
-	centroids_order[:,2] = centroids[:,2] * Z_DIM / bw.shape[2] 
+print(f"Threshold value: {thresh}")
 
-	beads = fmbeads.FMBeads(points=centroids_order)
+# find connected volumes within the image, assume each connected volume is a bead 
+# record the centroid of each connected volume as the location of the beads
+# relies on https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.regionprops
+label_img = label(bw, connectivity=bw.ndim)
+props = regionprops(label_img)
+centroids = np.zeros((len(props),3))
+for kk in range(len(props)):
+    centroids[kk]=props[kk].centroid
 
-	return beads
+print(f"How any beads: {len(centroids)}")
+
+centroids_order = np.zeros(centroids.shape)
+centroids_order[:,0] = centroids[:,1] * X_DIM / bw.shape[1] 
+centroids_order[:,1] = centroids[:,0] * Y_DIM / bw.shape[0]
+centroids_order[:,2] = centroids[:,2] * Z_DIM / bw.shape[2] 
+
+beads = fmbeads.FMBeads(points=centroids_order)
 
