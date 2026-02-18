@@ -8,6 +8,8 @@ from . import fmtracker
 import math
 from pathlib import Path
 
+#plt.rcParams["text.usetex"] = False
+
 class FMPlot:
 
     def __init__(self, *args, **kwargs):

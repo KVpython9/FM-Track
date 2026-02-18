@@ -114,11 +114,11 @@ class TranslationCorrector:
         
         # --> fit MARS models 
         self.model_U = Earth(max_degree=2,max_terms=10)
-        self.model_U.fit(self.Z_safe,self.U_safe)
+        self.model_U.fit(self.Z_safe.reshape(-1,1),self.U_safe.reshape(-1,1))
         self.model_V = Earth(max_degree=2,max_terms=10)
-        self.model_V.fit(self.Z_safe,self.V_safe)
+        self.model_V.fit(self.Z_safe.reshape(-1,1),self.V_safe.reshape(-1,1))
         self.model_W = Earth(max_degree=2,max_terms=10)
-        self.model_W.fit(self.Z_safe,self.W_safe)
+        self.model_W.fit(self.Z_safe.reshape(-1,1),self.W_safe.reshape(-1,1))
 
     def correct_beads(self, beads):
         """Corrects beads using translation correction model
@@ -138,9 +138,9 @@ class TranslationCorrector:
         x_pos, y_pos, z_pos = beads.get_xyz()
 
         # --> re-define Z 
-        pred_U = self.model_U.predict(z_pos)
-        pred_V = self.model_V.predict(z_pos)
-        pred_W = self.model_W.predict(z_pos)
+        pred_U = self.model_U.predict(z_pos.reshape(-1,1)).flatten()
+        pred_V = self.model_V.predict(z_pos.reshape(-1,1)).flatten()
+        pred_W = self.model_W.predict(z_pos.reshape(-1,1)).flatten()
         
         # --> correct new bead positions 
         x_pos_new = x_pos.copy()
@@ -174,9 +174,9 @@ class TranslationCorrector:
         points = mesh.points
 
         # --> correct new cell position 
-        pred_cell_0 = self.model_U.predict(points[:,2])
-        pred_cell_1 = self.model_V.predict(points[:,2])
-        pred_cell_2 = self.model_W.predict(points[:,2])
+        pred_cell_0 = self.model_U.predict(points[:,2].reshape(-1, 1)).flatten()
+        pred_cell_1 = self.model_V.predict(points[:,2].reshape(-1, 1)).flatten()
+        pred_cell_2 = self.model_W.predict(points[:,2].reshape(-1, 1)).flatten()
         
         points_new = np.zeros(points.shape)
         points_new[:,0] = points[:,0] - pred_cell_0
@@ -210,9 +210,9 @@ class TranslationCorrector:
     def create_figure(self):
         # --> plot MARS models 
         Z_line = np.linspace(np.min(self.Z),np.max(self.Z),100)
-        pred_line_U = self.model_U.predict(Z_line)
-        pred_line_V = self.model_V.predict(Z_line)
-        pred_line_W = self.model_W.predict(Z_line)
+        pred_line_U = self.model_U.predict(Z_line.reshape(-1,1)).flatten()
+        pred_line_V = self.model_V.predict(Z_line.reshape(-1,1)).flatten()
+        pred_line_W = self.model_W.predict(Z_line.reshape(-1,1)).flatten()
 
         fig = plt.figure(figsize=(15,5))
         fig.tight_layout()

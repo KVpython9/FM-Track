@@ -331,7 +331,6 @@ def plot_only_cells(filename,cell_init,cell_final,X_DIM,Y_DIM,Z_DIM,figtype_list
 
 	fig = plt.figure()
 	plt.style.use(stylepath)
-	plt.rc('text', usetex=True)
 	plt.rc('font', family='serif')
 	fig.set_figheight(5)
 	fig.set_figwidth(10)
@@ -353,7 +352,6 @@ def plot_only_scores(filename,neigh_score,dir_score,figtype_list):
 
 	fig = plt.figure()
 	plt.style.use(stylepath)
-	plt.rc('text', usetex=True)
 	plt.rc('font', family='serif')
 	fig.set_figheight(5)
 	fig.set_figwidth(10)
@@ -386,7 +384,6 @@ def plot_only_slice(filename,dir_score,X,Y,Z,U,V,W,cell_init,cell_final,X_DIM,Y_
 
 	fig = plt.figure()
 	plt.style.use(stylepath)
-	plt.rc('text', usetex=True)
 	plt.rc('font', family='serif')
 	fig.set_figheight(5)
 	fig.set_figwidth(15)
@@ -420,7 +417,6 @@ def plot_only_distance(filename,cell,dist_from_edge,dist_from_cell,mag_list,figt
 
 	fig = plt.figure()
 	plt.style.use(stylepath)
-	plt.rc('text', usetex=True)
 	plt.rc('font', family='serif')
 	fig.set_figheight(5)
 	fig.set_figwidth(5)
@@ -448,7 +444,6 @@ def plot_all(filename,dir_score,neigh_score,dist_from_edge,dist_from_cell,mag_li
 
 	fig = plt.figure()
 	plt.style.use(stylepath)
-	plt.rc('text', usetex=True)
 	plt.rc('font', family='serif')
 	fig.set_figheight(10)
 	fig.set_figwidth(20)
@@ -645,7 +640,6 @@ def save_gp_plot(gp_U, gp_V, gp_W, scaler, cell_init, cell_final, dims):
 	
 	fig = plt.figure()
 	plt.style.use(stylepath)
-	plt.rc('text', usetex=True)
 	plt.rc('font', family='serif')
 	fig.set_figheight(20)
 	fig.set_figwidth(15)
