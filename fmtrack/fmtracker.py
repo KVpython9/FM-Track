@@ -18,6 +18,8 @@ from sklearn.gaussian_process.kernels import (RBF, Matern, RationalQuadratic,
 from sklearn.neighbors import KernelDensity
 from sklearn import preprocessing
 
+from pathlib import Path
+
 class FMTracker:
 
 	def __init__(self,cell_init=None,cell_final=None,beads_init=None,beads_final=None):
@@ -249,7 +251,11 @@ class FMTracker:
 
 		# saves graphs (except gp model)
 		plotter = fmtrack.FMPlot(self)
-		plotter.save_native_plots(folderpath)
+		if self.cell_init is not None:
+			plotter.save_native_plots(folderpath)
+		else:
+			_path = Path(folderpath).joinpath('Score_plots')
+        	plotter.save_plot_only_scores(_path)
 
 		# saves gp models and graph
 		if self.run_gp:
