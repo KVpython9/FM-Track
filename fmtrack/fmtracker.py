@@ -253,9 +253,6 @@ class FMTracker:
 		plotter = fmtrack.FMPlot(self)
 		if self.cell_init is not None:
 			plotter.save_native_plots(folderpath)
-		else:
-			_path = Path(folderpath).joinpath('Score_plots')
-			plotter.save_plot_only_scores(_path)
 
 		# saves gp models and graph
 		if self.run_gp:
