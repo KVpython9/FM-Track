@@ -13,3 +13,6 @@
 
 # other
 *.DS_Store
+
+# Output of the toggle_features.py / batch_proc.py example tracking runs
+/examples/data/Track_CytoD_to_Normal/
