@@ -152,21 +152,49 @@ def get_bead_centers(input_file, dims, color_idx=1):
 
     """
 
+	# import the image file
+	all_array = tif_reader(input_file,color_idx)
+
+	return get_bead_centers_from_array(all_array, dims)
+
+
+def get_bead_centers_from_array(all_array, dims):
+	"""Creates a FMBeads object from an already-loaded intensity volume.
+
+	Split out of `get_bead_centers` so that callers holding a volume from a
+	reader other than `tif_reader` (e.g. an OME-TIFF z-stack) run the exact
+	same segmentation. `get_bead_centers` is this function plus `tif_reader`.
+
+	Parameters
+	----------
+	all_array : numpy.ndarray
+		Intensity volume of shape (num_rows, num_cols, num_slices), i.e. the
+		layout `tif_reader` returns: axis 0 is the image row (y), axis 1 the
+		image column (x), axis 2 the z slice.
+	dims : np.array
+		Total length of microscope imagery along the x, y, and z dimensions
+
+	Returns
+	----------
+	beads : FMBeads
+		An FMBeads object with bead positions corresponding to those calculated from imagery data
+
+    """
+
 	X_DIM = dims[0]; Y_DIM = dims[1]; Z_DIM = dims[2]
 
-	# import the image file and apply a gaussian filter 
-	all_array = tif_reader(input_file,color_idx)
+	# apply a gaussian filter
 	all_array = ndimage.gaussian_filter(all_array,1)
-	
-	# apply an otsu filter, specify the filter at each z slice 
-	# otsu filter https://en.wikipedia.org/wiki/Otsu%27s_method 
+
+	# apply an otsu filter, specify the filter at each z slice
+	# otsu filter https://en.wikipedia.org/wiki/Otsu%27s_method
 	num_slice = all_array.shape[2]
 	bw = np.zeros((all_array.shape))
 	for kk in range(0,num_slice):
 		thresh = threshold_otsu(all_array[:,:,kk])
 		bw[:,:,kk] = all_array[:,:,kk] > thresh
-	
-	# find connected volumes within the image, assume each connected volume is a bead 
+
+	# find connected volumes within the image, assume each connected volume is a bead
 	# record the centroid of each connected volume as the location of the beads
 	# relies on https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.regionprops
 	label_img = label(bw, connectivity=bw.ndim)
@@ -174,11 +202,11 @@ def get_bead_centers(input_file, dims, color_idx=1):
 	centroids = np.zeros((len(props),3))
 	for kk in range(len(props)):
 		centroids[kk]=props[kk].centroid
-	
+
 	centroids_order = np.zeros(centroids.shape)
-	centroids_order[:,0] = centroids[:,1] * X_DIM / bw.shape[1] 
+	centroids_order[:,0] = centroids[:,1] * X_DIM / bw.shape[1]
 	centroids_order[:,1] = centroids[:,0] * Y_DIM / bw.shape[0]
-	centroids_order[:,2] = centroids[:,2] * Z_DIM / bw.shape[2] 
+	centroids_order[:,2] = centroids[:,2] * Z_DIM / bw.shape[2]
 
 	beads = fmbeads.FMBeads(points=centroids_order)
 

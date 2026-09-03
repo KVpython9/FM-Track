@@ -53,6 +53,7 @@ class FMTracker:
 		self.beads_final_spurious = None
 
 		self.save_native_mesh = False
+		self.save_plots = True
 		self.run_gp = False
 		self.gp_corrected_cell = True
 
@@ -248,8 +249,14 @@ class FMTracker:
 			np.savetxt(path+'/beads_final.txt', self.beads_final_spurious.points)
 
 		# saves graphs (except gp model)
-		plotter = fmtrack.FMPlot(self)
-		plotter.save_native_plots(folderpath)
+		# Every native plot routes through FMPlot._before_any_2d_plot, which
+		# needs a cell mesh (post_process.color_point_direction dereferences
+		# cell.points). A tracking-only run has no cell, so plotting is skipped
+		# rather than raising -- set save_plots False to skip it even when a
+		# cell is present.
+		if self.save_plots and self.cell_init is not None:
+			plotter = fmtrack.FMPlot(self)
+			plotter.save_native_plots(folderpath)
 
 		# saves gp models and graph
 		if self.run_gp:
