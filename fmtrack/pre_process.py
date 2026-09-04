@@ -132,7 +132,31 @@ def get_cell_surface(input_file, dims, color_idx=0, cell_threshold=1.0):
 #	OUTPUTS:
 #		- x, y, z position of each bead based on the input images 
 ##########################################################################################
-def get_bead_centers(input_file, dims, color_idx=1):
+def signal_depth(all_array):
+	"""Number of leading z slices that still carry bead signal.
+
+	The whole-volume Otsu threshold is used as the test: a slice counts as
+	carrying signal if its brightest voxel exceeds it. Unlike the per-slice
+	threshold this one cannot adapt to an empty slice, so it is a meaningful
+	statement about that slice's content.
+
+	`all_array` is expected to be the *filtered* volume, so that the maxima
+	and the threshold sit on the same scale as the per-slice Otsu that follows.
+
+	The signal region is contiguous from the coverslip up in practice (checked
+	over the 42 stacks of the ASMC dataset: for every one, the first slice
+	below threshold is also the last slice above it). If a stray slice above
+	the drop does clear the threshold, the returned depth extends to include
+	it -- keeping a few noisy slices is the lesser error, since the caller
+	still thresholds them per-slice.
+	"""
+	above = all_array.max(axis=(0,1)) > threshold_otsu(all_array)
+	if not above.any():
+		return 0
+	return int(np.max(np.where(above)[0])) + 1
+
+
+def get_bead_centers(input_file, dims, color_idx=1, threshold='per-slice'):
 	"""Creates a FMBeads object from image data
 
 	Parameters
@@ -142,10 +166,12 @@ def get_bead_centers(input_file, dims, color_idx=1):
 		Example : input_file='./CytoD/Beads/Gel 2 CytoD%s.tif'
 	dims : np.array
 		Total length of microscope imagery along the x, y, and z dimensions
-	color_idx : 
+	color_idx :
 		The color to examine (0=red, 1=green, 2=blue)
+	threshold : str or float
+		Thresholding strategy; see `get_bead_centers_from_array`.
 
-	Returns 
+	Returns
 	----------
 	beads : FMBeads
 		An FMBeads object with bead positions corresponding to those calculated from imagery data
@@ -155,10 +181,10 @@ def get_bead_centers(input_file, dims, color_idx=1):
 	# import the image file
 	all_array = tif_reader(input_file,color_idx)
 
-	return get_bead_centers_from_array(all_array, dims)
+	return get_bead_centers_from_array(all_array, dims, threshold=threshold)
 
 
-def get_bead_centers_from_array(all_array, dims):
+def get_bead_centers_from_array(all_array, dims, threshold='per-slice'):
 	"""Creates a FMBeads object from an already-loaded intensity volume.
 
 	Split out of `get_bead_centers` so that callers holding a volume from a
@@ -173,6 +199,38 @@ def get_bead_centers_from_array(all_array, dims):
 		image column (x), axis 2 the z slice.
 	dims : np.array
 		Total length of microscope imagery along the x, y, and z dimensions
+	threshold : str or float
+		How the binary bead mask is thresholded, after the gaussian filter.
+
+		'per-slice'
+			An Otsu threshold recomputed for every z slice. The original
+			behaviour, and the default.
+		'global'
+			One Otsu threshold over the whole volume.
+		'per-slice-truncated'
+			The global Otsu threshold is used only to find the depth at which
+			the signal ends -- the first z slice whose maximum falls below it.
+			That slice and everything above it are zeroed, and the per-slice
+			Otsu is then run on what remains.
+		float
+			That absolute intensity, used directly.
+
+		Per-slice Otsu assumes every slice holds beads: Otsu maximizes the
+		separation between two classes, so on a slice that is entirely
+		background it splits the noise and returns a near-zero threshold,
+		admitting anything nonzero. Where the bead signal dies partway up a
+		stack -- which is the case for stacks acquired through an air
+		objective into an aqueous sample -- the empty slices then contribute
+		a large volume of thresholded noise, and `label(..., connectivity=3)`
+		links it into a single object that swallows the real beads.
+
+		A 'global' threshold removes that per-slice degree of freedom, but it
+		is itself dragged down by all the empty slices it is averaged over, so
+		in the bead-bearing slices it sits well below the per-slice value and
+		merges neighbouring beads into blobs. 'per-slice-truncated' uses the
+		global threshold for the one thing it is reliable for -- saying where
+		the signal stops -- and leaves the thresholding inside the signal
+		region to the per-slice Otsu that was calibrated for it.
 
 	Returns
 	----------
@@ -186,13 +244,31 @@ def get_bead_centers_from_array(all_array, dims):
 	# apply a gaussian filter
 	all_array = ndimage.gaussian_filter(all_array,1)
 
-	# apply an otsu filter, specify the filter at each z slice
+	# threshold to a binary bead mask
 	# otsu filter https://en.wikipedia.org/wiki/Otsu%27s_method
-	num_slice = all_array.shape[2]
-	bw = np.zeros((all_array.shape))
-	for kk in range(0,num_slice):
-		thresh = threshold_otsu(all_array[:,:,kk])
-		bw[:,:,kk] = all_array[:,:,kk] > thresh
+	if threshold in ('per-slice', 'per-slice-truncated'):
+		num_slice = all_array.shape[2]
+		if threshold == 'per-slice-truncated':
+			num_slice = signal_depth(all_array)
+		# apply an otsu filter, specify the filter at each z slice. Slices at
+		# and above num_slice are left zero, which is what zeroing their
+		# voxels would produce and avoids running Otsu on an empty slice.
+		bw = np.zeros((all_array.shape))
+		for kk in range(0,num_slice):
+			thresh = threshold_otsu(all_array[:,:,kk])
+			bw[:,:,kk] = all_array[:,:,kk] > thresh
+	else:
+		if threshold == 'global':
+			thresh = threshold_otsu(all_array)
+		elif isinstance(threshold, str):
+			raise ValueError(
+				"threshold must be 'per-slice', 'global', or a number; got %r"
+				% (threshold,))
+		else:
+			thresh = float(threshold)
+		# Kept as float, matching the per-slice branch's dtype, so `label` and
+		# `regionprops` see the same input either way.
+		bw = (all_array > thresh).astype(float)
 
 	# find connected volumes within the image, assume each connected volume is a bead
 	# record the centroid of each connected volume as the location of the beads

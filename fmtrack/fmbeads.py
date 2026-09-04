@@ -24,7 +24,8 @@ class FMBeads:
     def get_xyz(self):
         return self.points[:,0].copy(), self.points[:,1].copy(), self.points[:,2].copy()
 
-    def get_bead_centers(self, filenames_beads, dims, bead_channel=1):
+    def get_bead_centers(self, filenames_beads, dims, bead_channel=1,
+                         threshold='per-slice'):
         """Creates a FMBeads object from image data
 
         Parameters
@@ -36,8 +37,10 @@ class FMBeads:
 		    Total length of microscope imagery along the x, y, and z dimensions (149.95, 149.95, and 140.0 for the example data)
         bead_channel : 
             The color to examine (0=red, 1=green, 2=blue) (our example data uses green for cells)
+        threshold : str or float
+            Thresholding strategy; see `pre_process.get_bead_centers_from_array`.
 
         """
 
-        beads = pre_process.get_bead_centers(filenames_beads, dims, color_idx=bead_channel)
+        beads = pre_process.get_bead_centers(filenames_beads, dims, color_idx=bead_channel, threshold=threshold)
         self.points = beads.points
