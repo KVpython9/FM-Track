@@ -25,7 +25,7 @@ class FMBeads:
         return self.points[:,0].copy(), self.points[:,1].copy(), self.points[:,2].copy()
 
     def get_bead_centers(self, filenames_beads, dims, bead_channel=1,
-                         threshold='per-slice'):
+                         threshold='per-slice', sigma=1):
         """Creates a FMBeads object from image data
 
         Parameters
@@ -39,8 +39,11 @@ class FMBeads:
             The color to examine (0=red, 1=green, 2=blue) (our example data uses green for cells)
         threshold : str or float
             Thresholding strategy; see `pre_process.get_bead_centers_from_array`.
+        sigma : float or sequence of 3 floats
+            Gaussian smoothing before thresholding, in voxels, in (row, col,
+            slice) order; see `pre_process.get_bead_centers_from_array`.
 
         """
 
-        beads = pre_process.get_bead_centers(filenames_beads, dims, color_idx=bead_channel, threshold=threshold)
+        beads = pre_process.get_bead_centers(filenames_beads, dims, color_idx=bead_channel, threshold=threshold, sigma=sigma)
         self.points = beads.points
